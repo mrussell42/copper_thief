@@ -3,7 +3,7 @@ Kicad Copper Thief Pattern Generator
 
 This is a repo for a KiCad Plugin which converts a filled copper zone into an
 array of circular dots.  This is a technique used to balance the chemical
-plating process.
+plating process. More detail [here](https://electronics.stackexchange.com/questions/85633/what-is-copper-thieving-and-why-use-it)
 
 Installation:
 

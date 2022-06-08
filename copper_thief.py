@@ -86,7 +86,12 @@ class Copper_Thief(pcbnew.ActionPlugin):
         board = pcbnew.GetBoard()
         windows = [x for x in wx.GetTopLevelWindows()]
 
-        parent_frame = [x for x in windows if 'pcbnew' in x.GetTitle().lower()][0]
+        try:
+            parent_frame = [x for x in windows if 'pcbnew' in x.GetTitle().lower()][0]
+        except IndexError:
+            # Kicad 6 window title is "pcb editor"
+            parent_frame = [x for x in windows if 'pcb editor' in x.GetTitle().lower()][0]
+                
         print(parent_frame)
         aParameters = CopperThief_Dlg(parent_frame)
 
@@ -144,8 +149,8 @@ class Dotter():
         dot = pcbnew.PCB_SHAPE(self.pcb)
         dot.SetShape(pcbnew.S_CIRCLE)
         dot.SetLayer(layer)
-        dot.SetArcStart(start)
-        dot.SetArcEnd(start)
+        dot.SetStart(start)
+        dot.SetEnd(start)
         dot.SetWidth(width)
         dot.SetCenter(center)
         dot.SetFilled(True)

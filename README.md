@@ -8,7 +8,7 @@ plating process. More detail [here](https://electronics.stackexchange.com/questi
 Installation:
 
 Clone the repository into your local plugin folder
-~/.config/kicad/5.99/scripting/plugins/
+~/.local/share/kicad/6.0/scripting/plugins/
 
 
 Usage:

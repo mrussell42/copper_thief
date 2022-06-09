@@ -112,7 +112,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
                 zonename = zone.GetZoneName()
                 if zonename.lower() in THIEVING_ZONENAMES:
                     dotter.apply_dots(zone, spacing=spacing, radius=radius)
-                    board.Remove(zone)
+                    #board.Remove(zone)
                 else:
                     wx.MessageBox("Zone name must be \"theiving\".", "Check zone name.", wx.OK)
         aParameters.Destroy()
@@ -125,18 +125,51 @@ class Dotter():
 
     def apply_dots(self, zone, spacing=2, radius=0.5):
         """Iterate over the zone area and add dots if inside the zone."""
+        zones = self.pcb.Zones()
         layer = zone.GetLayer()
+        
+        # Get the zone outline and deflate it so we don't put dots to close to the outside
+        zone_outline = zone.Outline()
+        zone_outline.Deflate(FromMM(radius), 16)
+        zone.SetOutline(zone_outline)
+        
+        
         bbox = zone.GetBoundingBox()
         zonepolys = zone.GetFilledPolysList(layer)
+        
+        # Increase the clearance so we move even further away from existing copper
+        clearance = zone.GetLocalClearance()
+        zone.SetLocalClearance(clearance + int(radius * 1e6))
+        zone.SetNeedRefill(True)
+        filler = pcbnew.ZONE_FILLER(self.pcb)
+        filler.Fill(zones)
 
-        # Deflate (ie shrink) the zone so we don't place dots close to the zone edge
-        zonepolys.Deflate(FromMM(spacing / 2), 16)
-        print(f"Box Corners {bbox.GetLeft()/ 1e6}, {bbox.GetRight() / 1e6}")
+        # Find any keep out zones to check later when we're dotting
+        keep_out_zones = []
+        for koz in zones:
+            if koz.GetIsRuleArea():
+                keep_out_zones.append(koz)
+        
+        # Iterate over the bounding box of the chosen zone
         for x in np.arange(bbox.GetLeft() / 1e6, bbox.GetRight() / 1e6, spacing):
             for y in np.arange(bbox.GetTop() / 1e6, bbox.GetBottom() / 1e6, spacing):
-                if zonepolys.Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y)), FromMM(0.5)):
-                    dot = self.create_dot(layer, x, y, radius, 1)
-                    self.pcb.Add(dot)
+                # If the dot centre is inside the the deflated zone poly, we're ok to place a dot
+                if zonepolys.Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y))):#, FromMM(radius)):
+                    # Check that the dot wont touch any keep out zones
+                    touch_keepout = False
+                    for koz in keep_out_zones:
+                        if koz.Outline().Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y)), FromMM(radius)):
+                            touch_keepout = True
+                            
+                    if not touch_keepout:
+                        dot = self.create_dot(layer, x, y, radius, 1)
+                        self.pcb.Add(dot)
+        
+        # Reset the zone clearance
+        zone.SetLocalClearance(clearance)
+        zone.SetNeedRefill(True)
+        filler = pcbnew.ZONE_FILLER(self.pcb)
+        filler.Fill(self.pcb.Zones())
         pcbnew.Refresh()
         # self.RefillBoardAreas()
 

@@ -33,7 +33,7 @@ class StreamToLogger(object):
 
 # set up logger
 logging.basicConfig(level=logging.DEBUG,
-                    filename="thief.log",
+                    filename="/home/mrussell/logs/thief.log",
                     filemode='w',
                     format='%(asctime)s %(name)s %(lineno)d:%(message)s',
                     datefmt='%m-%d %H:%M:%S')
@@ -111,6 +111,7 @@ class Copper_Thief(pcbnew.ActionPlugin):
             for zone in zones:
                 zonename = zone.GetZoneName()
                 if zonename.lower() in THIEVING_ZONENAMES:
+                    logger.info(f"Applying dots to {zonename} with spacing {spacing} and radius: {radius}")
                     dotter.apply_dots(zone, spacing=spacing, radius=radius)
                     #board.Remove(zone)
                 else:
@@ -130,13 +131,13 @@ class Dotter():
         
         # Get the zone outline and deflate it so we don't put dots to close to the outside
         zone_outline = zone.Outline()
-        zone_outline.Deflate(FromMM(radius), 16)
+        zone_outline.Deflate(FromMM(radius), 16, pcbnew.CORNER_STRATEGY_ROUND_ALL_CORNERS)
         zone.SetOutline(zone_outline)
         
         
         bbox = zone.GetBoundingBox()
         zonepolys = zone.GetFilledPolysList(layer)
-        
+        logger.info(f"Zone polys , {str(zonepolys)}")
         # Increase the clearance so we move even further away from existing copper
         clearance = zone.GetLocalClearance()
         zone.SetLocalClearance(clearance + int(radius * 1e6))
@@ -149,12 +150,16 @@ class Dotter():
         for koz in zones:
             if koz.GetIsRuleArea():
                 keep_out_zones.append(koz)
+                logger.info("Added Keepout Zone")
         
         # Iterate over the bounding box of the chosen zone
         for x in np.arange(bbox.GetLeft() / 1e6, bbox.GetRight() / 1e6, spacing):
             for y in np.arange(bbox.GetTop() / 1e6, bbox.GetBottom() / 1e6, spacing):
                 # If the dot centre is inside the the deflated zone poly, we're ok to place a dot
-                if zonepolys.Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y))):#, FromMM(radius)):
+                logger.info(f"Try {x},{y}")
+                if zone.HitTestFilledArea(layer, pcbnew.VECTOR2I(FromMM(x), FromMM(y))): 
+    #                if zonepolys.Collide(pcbnew.VECTOR2I(FromMM(x), FromMM(y))):#, FromMM(radius)):
+                    logger.info(f"  In Zone")                    
                     # Check that the dot wont touch any keep out zones
                     touch_keepout = False
                     for koz in keep_out_zones:
@@ -175,10 +180,10 @@ class Dotter():
 
     def create_dot(self, layer, x, y, r, width):
         """Create a dot."""
-        print(f"Creating dot at {x}, {y} with radius {r}")
+        logger.info(f"Creating dot at {x}, {y} with radius {r}")
 
-        center = pcbnew.wxPoint(FromMM(x), FromMM(y))
-        start = pcbnew.wxPoint(FromMM(x + r), FromMM(y))
+        center = pcbnew.VECTOR2I(FromMM(x), FromMM(y))
+        start = pcbnew.VECTOR2I(FromMM(x + r), FromMM(y))
         dot = pcbnew.PCB_SHAPE(self.pcb)
         dot.SetShape(pcbnew.S_CIRCLE)
         dot.SetLayer(layer)
